@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مُنشئ فيديو الإشعارات - Notification Video Creator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1; --primary-dark: #4f46e5; --secondary: #ec4899;
+            --accent: #06b6d4; --dark: #0f172a; --darker: #020617;
+            --card: #1e293b; --card-hover: #334155; --text: #f1f5f9;
+            --text-muted: #94a3b8; --border: #334155; --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Tajawal', 'Cairo', sans-serif;
+            background: var(--darker); color: var(--text); min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .bg-animation {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; overflow: hidden;
+        }
+        .bg-animation::before {
+            content: ''; position: absolute; width: 200%; height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(99,102,241,0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(236,72,153,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 20%, rgba(6,182,212,0.1) 0%, transparent 50%);
+            animation: bgMove 20s ease-in-out infinite;
+        }
+        @keyframes bgMove {
+            0%,100% { transform: translate(0,0) rotate(0deg); }
+            33% { transform: translate(-5%,5%) rotate(5deg); }
+            66% { transform: translate(5%,-5%) rotate(-5deg); }
+        }
+        .header { text-align: center; padding: 2rem 1rem 1rem; }
+        .header h1 {
+            font-size: 2.5rem; font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        .header p { color: var(--text-muted); font-size: 1.1rem; font-weight: 300; }
+        .container {
+            max-width: 1400px; margin: 0 auto; padding: 1rem;
+            display: grid; grid-template-columns: 1fr 420px; gap: 2rem; align-items: start;
+        }
+        @media (max-width: 1024px) { .container { grid-template-columns: 1fr; } }
+        .preview-section { position: sticky; top: 1rem; }
+        .preview-label {
+            text-align: center; margin-bottom: 1rem; color: var(--text-muted);
+            font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px;
+        }
+        .phone-frame {
+            width: 340px; height: 680px; margin: 0 auto; background: #000;
+            border-radius: 40px; padding: 12px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.8), 0 0 0 2px #333, inset 0 0 20px rgba(255,255,255,0.05);
+            position: relative;
+        }
+        .phone-notch {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            width: 120px; height: 28px; background: #000;
+            border-radius: 0 0 20px 20px; z-index: 10;
+        }
+        .phone-screen {
+            width: 100%; height: 100%; border-radius: 32px;
+            overflow: hidden; position: relative; background: #1a1a2e;
+        }
+        #videoCanvas { width: 100%; height: 100%; display: block; }
+        .controls-section { display: flex; flex-direction: column; gap: 1.2rem; }
+        .panel {
+            background: var(--card); border-radius: 20px; padding: 1.5rem;
+            border: 1px solid var(--border); transition: all 0.3s ease;
+        }
+        .panel:hover { border-color: var(--primary); box-shadow: 0 0 30px rgba(99,102,241,0.1); }
+        .panel-title {
+            font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;
+            display: flex; align-items: center; gap: 0.5rem; color: var(--primary);
+        }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label {
+            display: block; margin-bottom: 0.5rem; font-size: 0.9rem;
+            color: var(--text-muted); font-weight: 500;
+        }
+        .form-group input[type="text"], .form-group input[type="time"],
+        .form-group input[type="date"], .form-group textarea, .form-group select {
+            width: 100%; padding: 0.75rem 1rem; background: var(--darker);
+            border: 1px solid var(--border); border-radius: 12px; color: var(--text);
+            font-family: inherit; font-size: 0.95rem; transition: all 0.3s ease;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none; border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .file-upload {
+            position: relative; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 2rem;
+            border: 2px dashed var(--border); border-radius: 16px;
+            cursor: pointer; transition: all 0.3s ease; background: var(--darker);
+        }
+        .file-upload:hover { border-color: var(--primary); background: rgba(99,102,241,0.05); }
+        .file-upload input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .file-upload svg { width: 40px; height: 40px; color: var(--primary); margin-bottom: 0.5rem; }
+        .file-upload span { color: var(--text-muted); font-size: 0.9rem; }
+        .notification-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .notification-item {
+            background: var(--darker); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1rem; position: relative; transition: all 0.3s ease;
+        }
+        .notification-item:hover { border-color: var(--accent); }
+        .notification-item .remove-btn {
+            position: absolute; top: 0.5rem; left: 0.5rem;
+            background: rgba(239,68,68,0.2); color: #ef4444; border: none;
+            width: 24px; height: 24px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; transition: all 0.2s;
+        }
+        .notification-item .remove-btn:hover { background: #ef4444; color: white; }
+        .notification-item input {
+            width: 100%; background: transparent; border: none;
+            color: var(--text); font-family: inherit; font-size: 0.95rem; padding: 0.25rem 0;
+        }
+        .notification-item input:focus { outline: none; }
+        .notification-item input::placeholder { color: var(--text-muted); }
+        .add-btn {
+            width: 100%; padding: 0.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white; border: none; border-radius: 12px;
+            font-family: inherit; font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .add-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(99,102,241,0.3); }
+        .actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .btn {
+            flex: 1; min-width: 140px; padding: 1rem 1.5rem; border: none;
+            border-radius: 16px; font-family: inherit; font-size: 1rem;
+            font-weight: 700; cursor: pointer; transition: all 0.3s ease;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white;
+        }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(99,102,241,0.4); }
+        .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--card-hover); border-color: var(--accent); }
+        .progress-container { display: none; margin-top: 1rem; }
+        .progress-container.active { display: block; }
+        .progress-bar { width: 100%; height: 8px; background: var(--darker); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 4px; transition: width 0.3s ease; width: 0%; }
+        .progress-text { text-align: center; margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); }
+        .toggle-group { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; }
+        .toggle-label { font-size: 0.9rem; color: var(--text); }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider::before { content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(24px); }
+        .color-picker { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .color-option { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; }
+        .color-option.active { border-color: white; box-shadow: 0 0 0 2px var(--primary); }
+        .range-slider { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: var(--darker); outline: none; }
+        .range-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); cursor: pointer; transition: all 0.2s; }
+        .range-slider::-webkit-slider-thumb:hover { transform: scale(1.2); box-shadow: 0 0 10px rgba(99,102,241,0.5); }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; background: var(--darker); padding: 0.25rem; border-radius: 12px; }
+        .tab { flex: 1; padding: 0.6rem; background: transparent; border: none; color: var(--text-muted); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: 10px; transition: all 0.3s; }
+        .tab.active { background: var(--primary); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .download-link { display: none; margin-top: 1rem; padding: 1rem; background: rgba(16,185,129,0.1); border: 1px solid var(--success); border-radius: 12px; text-align: center; }
+        .download-link.show { display: block; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .download-link a { color: var(--success); text-decoration: none; font-weight: 700; font-size: 1.1rem; }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.8rem; }
+            .phone-frame { width: 280px; height: 560px; }
+            .form-row { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; }
+            .btn { width: 100%; }
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--darker); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    <header class="header">
+        <h1>مُنشئ فيديو الإشعارات</h1>
+        <p>أنشئ فيديوهات إشعارات احترافية مشابهة للفيديو الأصلي</p>
+    </header>
+    <div class="container">
+        <div class="preview-section">
+            <div class="preview-label">المعاينة المباشرة</div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <canvas id="videoCanvas" width="1080" height="2160"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="controls-section">
+            <div class="panel">
+                <div class="panel-title">🖼️ الخلفية</div>
+                <div class="file-upload" id="bgUpload">
+                    <input type="file" id="bgImage" accept="image/*">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <span>اضغط لرفع صورة الخلفية</span>
+                </div>
+                <div class="form-group" style="margin-top:1rem">
+                    <label>أو اختر من المكتبة:</label>
+                    <div class="color-picker" id="bgPresets">
+                        <div class="color-option active" style="background:linear-gradient(180deg,#4a5568,#2d3748,#1a202c)" data-bg="dark"></div>
+                        <div class="color-option" style="background:linear-gradient(180deg,#667eea,#764ba2)" data-bg="purple"></div>
+                        <div class="color-option" style="background:linear-gradient(180deg,#f093fb,#f5576c)" data-bg="pink"></div>
+                        <div class="color-option" style="background:linear-gradient(180deg,#4facfe,#00f2fe)" data-bg="blue"></div>
+                        <div class="color-option" style="background:linear-gradient(180deg,#43e97b,#38f9d7)" data-bg="green"></div>
+                        <div class="color-option" style="background:linear-gradient(180deg,#fa709a,#fee140)" data-bg="sunset"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">⏰ الوقت والتاريخ</div>
+                <div class="form-row">
+                    <div class="form-group"><label>الوقت</label><input type="time" id="clockTime" value="12:01"></div>
+                    <div class="form-group"><label>التاريخ الميلادي</label><input type="date" id="gregDate" value="2026-04-25"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>اليوم (عربي)</label><input type="text" id="dayName" value="السبت"></div>
+                    <div class="form-group"><label>التاريخ الهجري</label><input type="text" id="hijriDate" value="8 ذو القعده, 1447"></div>
+                </div>
+                <div class="toggle-group">
+                    <span class="toggle-label">إظهار الثواني</span>
+                    <label class="toggle-switch"><input type="checkbox" id="showSeconds"><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">🔔 الإشعارات</div>
+                <div class="notification-list" id="notificationList">
+                    <div class="notification-item">
+                        <button class="remove-btn" onclick="removeNotification(this)">×</button>
+                        <input type="text" placeholder="نص الإشعار..." value="كل شيء في هذه الحيــــاة">
+                    </div>
+                    <div class="notification-item">
+                        <button class="remove-btn" onclick="removeNotification(this)">×</button>
+                        <input type="text" placeholder="نص الإشعار..." value="إما أن يتــركك أو تتـــركه">
+                    </div>
+                    <div class="notification-item">
+                        <button class="remove-btn" onclick="removeNotification(this)">×</button>
+                        <input type="text" placeholder="نص الإشعار..." value="إلا الله إن أقبلت إليه أغنــاك">
+                    </div>
+                    <div class="notification-item">
+                        <button class="remove-btn" onclick="removeNotification(this)">×</button>
+                        <input type="text" placeholder="نص الإشعار..." value="وإن تـــركتــــه نــاداك">
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addNotification()" style="margin-top:0.75rem">+ إضافة إشعار</button>
+            </div>
+            <div class="panel">
+                <div class="panel-title">⚙️ الإعدادات المتقدمة</div>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab(this,'timing')">⏱️ التوقيت</button>
+                    <button class="tab" onclick="switchTab(this,'style')">🎨 الأسلوب</button>
+                    <button class="tab" onclick="switchTab(this,'export')">📤 التصدير</button>
+                </div>
+                <div class="tab-content active" id="timing-tab">
+                    <div class="form-group">
+                        <label>مدة ظهور كل إشعار (ثانية)</label>
+                        <input type="range" class="range-slider" id="notifDuration" min="1" max="5" step="0.5" value="3">
+                        <div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-top:0.25rem"><span id="notifDurationVal">3</span> ثانية</div>
+                    </div>
+                    <div class="form-group">
+                        <label>مدة الانتقال (ثانية)</label>
+                        <input type="range" class="range-slider" id="transitionDuration" min="0.2" max="2" step="0.1" value="0.5">
+                        <div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-top:0.25rem"><span id="transitionDurationVal">0.5</span> ثانية</div>
+                    </div>
+                    <div class="form-group">
+                        <label>وقت الإشعار الوهمي</label>
+                        <input type="text" id="fakeTime" value="1:30:1 ص">
+                    </div>
+                </div>
+                <div class="tab-content" id="style-tab">
+                    <div class="form-group">
+                        <label>لون نص الوقت</label>
+                        <input type="color" id="timeColor" value="#ffffff" style="width:100%;height:40px;border-radius:8px;border:none;cursor:pointer">
+                    </div>
+                    <div class="form-group">
+                        <label>شفافية الإشعارات</label>
+                        <input type="range" class="range-slider" id="notifOpacity" min="0.5" max="1" step="0.05" value="0.92">
+                    </div>
+                    <div class="toggle-group">
+                        <span class="toggle-label">تأثير الظل</span>
+                        <label class="toggle-switch"><input type="checkbox" id="textShadow" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-group">
+                        <span class="toggle-label">تأثير الضباب</span>
+                        <label class="toggle-switch"><input type="checkbox" id="fogEffect" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="tab-content" id="export-tab">
+                    <div class="form-group">
+                        <label>جودة الفيديو</label>
+                        <select id="videoQuality">
+                            <option value="0.5">منخفضة (540p)</option>
+                            <option value="0.75" selected>متوسطة (720p)</option>
+                            <option value="1">عالية (1080p)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>معدل الإطارات (FPS)</label>
+                        <select id="fps">
+                            <option value="24">24 FPS</option>
+                            <option value="30" selected>30 FPS</option>
+                            <option value="60">60 FPS</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">📝 النص السفلي</div>
+                <div class="form-group"><input type="text" id="bottomText" value="لاتوجد إشعارات قديمه"></div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="generateVideo()">🎬 إنشاء الفيديو</button>
+                <button class="btn btn-secondary" onclick="previewAnimation()">👁️ معاينة</button>
+            </div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText">جاري الإنشاء...</div>
+            </div>
+            <div class="download-link" id="downloadLink">
+                <a href="#" id="downloadAnchor" download="notification-video.webm">⬇️ تحميل الفيديو</a>
+            </div>
+        </div>
+    </div>
+    <script>
+const state = { bgImage: null, bgPreset: 'dark', notifications: [], isPlaying: false, animationFrame: null, startTime: 0 };
+const canvas = document.getElementById('videoCanvas');
+const ctx = canvas.getContext('2d');
+
+function init() {
+    loadDefaultBackground();
+    updateNotificationsArray();
+    drawFrame(0);
+    setupEventListeners();
+}
+
+function setupEventListeners() {
+    document.getElementById('bgImage').addEventListener('change', handleBgUpload);
+    document.querySelectorAll('.color-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            document.querySelectorAll('.color-option').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            state.bgPreset = opt.dataset.bg;
+            state.bgImage = null;
+            drawFrame(0);
+        });
+    });
+    ['clockTime','gregDate','dayName','hijriDate','bottomText','fakeTime'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => drawFrame(0));
+    });
+    document.getElementById('notifDuration').addEventListener('input', function() {
+        document.getElementById('notifDurationVal').textContent = this.value;
+    });
+    document.getElementById('transitionDuration').addEventListener('input', function() {
+        document.getElementById('transitionDurationVal').textContent = this.value;
+    });
+    document.getElementById('notificationList').addEventListener('input', () => {
+        updateNotificationsArray(); drawFrame(0);
+    });
+    ['showSeconds','textShadow','fogEffect'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => drawFrame(0));
+    });
+}
+
+function loadDefaultBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#4a5568'); grad.addColorStop(0.4, '#2d3748');
+    grad.addColorStop(0.7, '#1a202c'); grad.addColorStop(1, '#0d1117');
+    state.bgGradient = grad;
+}
+
+function handleBgUpload(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() { state.bgImage = img; document.querySelectorAll('.color-option').forEach(o => o.classList.remove('active')); drawFrame(0); };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    document.querySelector('#bgUpload span').textContent = file.name;
+}
+
+function getPresetGradient(preset) {
+    const gradients = {
+        dark: ['#4a5568','#2d3748','#1a202c','#0d1117'],
+        purple: ['#667eea','#764ba2','#5a3d8a','#3d2b6b'],
+        pink: ['#f093fb','#f5576c','#d63e6b','#a8285a'],
+        blue: ['#4facfe','#00f2fe','#0099cc','#006699'],
+        green: ['#43e97b','#38f9d7','#2bc4a8','#1f9f8a'],
+        sunset: ['#fa709a','#fee140','#ff8c42','#e85d04']
+    };
+    const colors = gradients[preset] || gradients.dark;
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    colors.forEach((c, i) => grad.addColorStop(i / (colors.length - 1), c));
+    return grad;
+}
+
+function updateNotificationsArray() {
+    const items = document.querySelectorAll('.notification-item input');
+    state.notifications = Array.from(items).map(input => input.value).filter(v => v.trim());
+}
+
+function addNotification() {
+    const list = document.getElementById('notificationList');
+    const div = document.createElement('div');
+    div.className = 'notification-item';
+    div.innerHTML = '<button class="remove-btn" onclick="removeNotification(this)">×</button><input type="text" placeholder="نص الإشعار..." value="">';
+    list.appendChild(div);
+    updateNotificationsArray();
+}
+
+function removeNotification(btn) {
+    btn.parentElement.remove();
+    updateNotificationsArray();
+    drawFrame(0);
+}
+
+function switchTab(btn, tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(tabId + '-tab').classList.add('active');
+}
+
+function drawFrame(progress) {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    if (state.bgImage) { drawImageCover(ctx, state.bgImage, 0, 0, W, H); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, W, H); }
+    else { ctx.fillStyle = getPresetGradient(state.bgPreset); ctx.fillRect(0, 0, W, H); }
+    if (document.getElementById('fogEffect').checked) drawFog(W, H);
+    drawTimeDisplay(W, H);
+    drawNotifications(W, H, progress);
+    drawBottomText(W, H);
+}
+
+function drawImageCover(ctx, img, x, y, w, h) {
+    const ratio = Math.max(w / img.width, h / img.height);
+    const nw = img.width * ratio, nh = img.height * ratio;
+    const nx = x + (w - nw) / 2, ny = y + (h - nh) / 2;
+    ctx.drawImage(img, nx, ny, nw, nh);
+}
+
+function drawFog(W, H) {
+    const fogGrad = ctx.createLinearGradient(0, 0, 0, H * 0.6);
+    fogGrad.addColorStop(0, 'rgba(200,210,230,0.15)');
+    fogGrad.addColorStop(0.5, 'rgba(180,190,210,0.08)');
+    fogGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = fogGrad; ctx.fillRect(0, 0, W, H * 0.6);
+}
+
+function drawTimeDisplay(W, H) {
+    const timeColor = document.getElementById('timeColor').value;
+    const showSec = document.getElementById('showSeconds').checked;
+    const clockTime = document.getElementById('clockTime').value;
+    const dayName = document.getElementById('dayName').value;
+    const gregDate = document.getElementById('gregDate').value;
+    const hijriDate = document.getElementById('hijriDate').value;
+    const textShadow = document.getElementById('textShadow').checked;
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    if (textShadow) { ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 4; }
+    ctx.fillStyle = timeColor; ctx.font = '900 180px "Tajawal",sans-serif';
+    let displayTime = clockTime;
+    if (showSec) { const now = new Date(); displayTime += ':' + String(now.getSeconds()).padStart(2, '0'); }
+    ctx.fillText(displayTime, W / 2, 120);
+    ctx.font = '500 48px "Tajawal",sans-serif';
+    ctx.fillText(formatGregorianDate(gregDate, dayName), W / 2, 340);
+    ctx.font = '500 44px "Tajawal",sans-serif';
+    ctx.fillText(hijriDate, W / 2, 420);
+    ctx.restore();
+}
+
+function formatGregorianDate(dateStr, dayName) {
+    if (!dateStr) return dayName;
+    const d = new Date(dateStr);
+    const months = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    return dayName + ', ' + d.getDate() + ', ' + months[d.getMonth()];
+}
+
+function drawNotifications(W, H, progress) {
+    const notifications = state.notifications;
+    if (notifications.length === 0) return;
+    const notifDuration = parseFloat(document.getElementById('notifDuration').value) * 1000;
+    const transDuration = parseFloat(document.getElementById('transitionDuration').value) * 1000;
+    const fakeTime = document.getElementById('fakeTime').value;
+    const opacity = parseFloat(document.getElementById('notifOpacity').value);
+    const totalCycle = notifDuration + transDuration;
+    const currentTime = progress * totalCycle * notifications.length;
+    let activeIndex = Math.floor(currentTime / totalCycle);
+    let cycleProgress = (currentTime % totalCycle) / totalCycle;
+    for (let i = 0; i <= activeIndex && i < notifications.length; i++) {
+        const notif = notifications[i]; let yOffset = 0, alpha = opacity, slideOffset = 0;
+        if (i === activeIndex) {
+            const animProgress = Math.min(1, cycleProgress * totalCycle / transDuration);
+            slideOffset = (1 - easeOutCubic(animProgress)) * -100;
+            alpha = opacity * easeOutCubic(animProgress);
+            yOffset = (activeIndex - i) * 180;
+        } else if (i < activeIndex) {
+            yOffset = (activeIndex - i) * 180;
+            if (activeIndex - i > 3) alpha = 0;
+            else alpha = opacity * (1 - (activeIndex - i) * 0.15);
+        }
+        if (alpha <= 0.01) continue;
+        drawNotificationCard(W, H, notif, fakeTime, i, yOffset, slideOffset, alpha);
+    }
+}
+
+function drawNotificationCard(W, H, text, fakeTime, index, yOffset, slideOffset, alpha) {
+    const cardW = W - 80, cardH = 140, cardX = 40, baseY = 560;
+    const cardY = baseY - yOffset + slideOffset;
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(245,245,250,'+alpha+')';
+    roundRect(ctx, cardX, cardY, cardW, cardH, 30); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,200,210,0.3)'; ctx.lineWidth = 1;
+    roundRect(ctx, cardX, cardY, cardW, cardH, 30); ctx.stroke();
+    const iconX = cardX + cardW - 80, iconY = cardY + 25;
+    ctx.fillStyle = '#999'; ctx.font = '32px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('✉', iconX + 20, iconY + 30);
+    ctx.fillStyle = '#bbb'; ctx.font = '28px Arial';
+    ctx.fillText('⋯', iconX + 70, iconY + 28);
+    ctx.fillStyle = '#333'; ctx.font = '700 28px "Tajawal",sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('الآن', cardX + cardW - 160, cardY + 50);
+    ctx.fillStyle = '#e53e3e';
+    ctx.beginPath(); ctx.moveTo(cardX + cardW - 210, cardY + 38); ctx.lineTo(cardX + cardW - 200, cardY + 38); ctx.lineTo(cardX + cardW - 205, cardY + 48); ctx.fill();
+    ctx.fillStyle = '#666'; ctx.font = '400 24px "Tajawal",sans-serif';
+    ctx.fillText(fakeTime, cardX + cardW - 280, cardY + 50);
+    ctx.fillStyle = '#1a1a2e'; ctx.font = '700 38px "Tajawal",sans-serif'; ctx.textAlign = 'center';
+    const maxWidth = cardW - 60;
+    const words = text.split(' '); let line = '', lines = [];
+    for (let word of words) {
+        const testLine = line + word + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && line !== '') { lines.push(line); line = word + ' '; }
+        else { line = testLine; }
+    }
+    lines.push(line);
+    const lineHeight = 48, startY = cardY + 95 - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((l, i) => { ctx.fillText(l.trim(), cardX + cardW / 2, startY + i * lineHeight); });
+    ctx.restore();
+}
+
+function drawBottomText(W, H) {
+    const bottomText = document.getElementById('bottomText').value;
+    const textShadow = document.getElementById('textShadow').checked;
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    if (textShadow) { ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetY = 3; }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = '500 40px "Tajawal",sans-serif';
+    ctx.fillText(bottomText, W / 2, H - 120); ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+function previewAnimation() {
+    if (state.isPlaying) { state.isPlaying = false; cancelAnimationFrame(state.animationFrame); return; }
+    state.isPlaying = true; state.startTime = performance.now();
+    const notifDuration = parseFloat(document.getElementById('notifDuration').value) * 1000;
+    const transDuration = parseFloat(document.getElementById('transitionDuration').value) * 1000;
+    const totalDuration = (notifDuration + transDuration) * state.notifications.length;
+    function animate(now) {
+        if (!state.isPlaying) return;
+        const elapsed = now - state.startTime;
+        const progress = (elapsed % totalDuration) / totalDuration;
+        drawFrame(progress);
+        state.animationFrame = requestAnimationFrame(animate);
+    }
+    state.animationFrame = requestAnimationFrame(animate);
+}
+
+async function generateVideo() {
+    const quality = parseFloat(document.getElementById('videoQuality').value);
+    const fps = parseInt(document.getElementById('fps').value);
+    const notifDuration = parseFloat(document.getElementById('notifDuration').value);
+    const transDuration = parseFloat(document.getElementById('transitionDuration').value);
+    const targetW = Math.round(1080 * quality), targetH = Math.round(2160 * quality);
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = targetW; offCanvas.height = targetH;
+    const offCtx = offCanvas.getContext('2d');
+    const totalDuration = (notifDuration + transDuration) * state.notifications.length;
+    const totalFrames = Math.ceil(totalDuration * fps);
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const downloadLink = document.getElementById('downloadLink');
+    const downloadAnchor = document.getElementById('downloadAnchor');
+    progressContainer.classList.add('active');
+    downloadLink.classList.remove('show');
+
+    let mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+        if (MediaRecorder.isTypeSupported('video/webm')) mimeType = 'video/webm';
+        else { alert('متصفحك لا يدعم تصدير الفيديو'); progressContainer.classList.remove('active'); return; }
+    }
+
+    const stream = offCanvas.captureStream(fps);
+    const mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 8000000 * quality });
+    const chunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        downloadAnchor.href = url;
+        downloadAnchor.download = 'notification-video.webm';
+        downloadLink.classList.add('show');
+        progressContainer.classList.remove('active');
+        drawFrame(0);
+    };
+    mediaRecorder.start();
+    let currentFrame = 0;
+    function renderFrame() {
+        if (currentFrame >= totalFrames) { mediaRecorder.stop(); return; }
+        const progress = currentFrame / totalFrames;
+        drawFrameToCanvas(offCtx, targetW, targetH, progress);
+        const percent = Math.round((currentFrame / totalFrames) * 100);
+        progressFill.style.width = percent + '%';
+        progressText.textContent = 'جاري الإنشاء... ' + percent + '%';
+        currentFrame++;
+        setTimeout(renderFrame, 0);
+    }
+    renderFrame();
+}
+
+function drawFrameToCanvas(c, W, H, progress) {
+    const scale = W / 1080;
+    c.clearRect(0, 0, W, H);
+    if (state.bgImage) { drawImageCover(c, state.bgImage, 0, 0, W, H); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(0, 0, W, H); }
+    else { c.fillStyle = getPresetGradientForCtx(c, state.bgPreset, W, H); c.fillRect(0, 0, W, H); }
+    if (document.getElementById('fogEffect').checked) {
+        const fogGrad = c.createLinearGradient(0, 0, 0, H * 0.6);
+        fogGrad.addColorStop(0, 'rgba(200,210,230,0.15)');
+        fogGrad.addColorStop(0.5, 'rgba(180,190,210,0.08)');
+        fogGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = fogGrad; c.fillRect(0, 0, W, H * 0.6);
+    }
+    const timeColor = document.getElementById('timeColor').value;
+    const showSec = document.getElementById('showSeconds').checked;
+    const clockTime = document.getElementById('clockTime').value;
+    const dayName = document.getElementById('dayName').value;
+    const gregDate = document.getElementById('gregDate').value;
+    const hijriDate = document.getElementById('hijriDate').value;
+    const textShadow = document.getElementById('textShadow').checked;
+    c.save(); c.textAlign = 'center'; c.textBaseline = 'top';
+    if (textShadow) { c.shadowColor = 'rgba(0,0,0,0.5)'; c.shadowBlur = 20 * scale; c.shadowOffsetY = 4 * scale; }
+    c.fillStyle = timeColor; c.font = '900 ' + (180 * scale) + 'px "Tajawal",sans-serif';
+    let displayTime = clockTime;
+    if (showSec) { const now = new Date(); displayTime += ':' + String(now.getSeconds()).padStart(2, '0'); }
+    c.fillText(displayTime, W / 2, 120 * scale);
+    c.font = '500 ' + (48 * scale) + 'px "Tajawal",sans-serif';
+    c.fillText(formatGregorianDate(gregDate, dayName), W / 2, 340 * scale);
+    c.font = '500 ' + (44 * scale) + 'px "Tajawal",sans-serif';
+    c.fillText(hijriDate, W / 2, 420 * scale);
+    c.restore();
+    drawNotificationsToCanvas(c, W, H, progress, scale);
+    const bottomText = document.getElementById('bottomText').value;
+    c.save(); c.textAlign = 'center'; c.textBaseline = 'bottom';
+    if (textShadow) { c.shadowColor = 'rgba(0,0,0,0.6)'; c.shadowBlur = 15 * scale; c.shadowOffsetY = 3 * scale; }
+    c.fillStyle = 'rgba(255,255,255,0.9)'; c.font = '500 ' + (40 * scale) + 'px "Tajawal",sans-serif';
+    c.fillText(bottomText, W / 2, H - 120 * scale);
+    c.restore();
+}
+
+function getPresetGradientForCtx(c, preset, W, H) {
+    const gradients = {
+        dark: ['#4a5568','#2d3748','#1a202c','#0d1117'],
+        purple: ['#667eea','#764ba2','#5a3d8a','#3d2b6b'],
+        pink: ['#f093fb','#f5576c','#d63e6b','#a8285a'],
+        blue: ['#4facfe','#00f2fe','#0099cc','#006699'],
+        green: ['#43e97b','#38f9d7','#2bc4a8','#1f9f8a'],
+        sunset: ['#fa709a','#fee140','#ff8c42','#e85d04']
+    };
+    const colors = gradients[preset] || gradients.dark;
+    const grad = c.createLinearGradient(0, 0, 0, H);
+    colors.forEach((col, i) => grad.addColorStop(i / (colors.length - 1), col));
+    return grad;
+}
+
+function drawNotificationsToCanvas(c, W, H, progress, scale) {
+    const notifications = state.notifications;
+    if (notifications.length === 0) return;
+    const notifDuration = parseFloat(document.getElementById('notifDuration').value) * 1000;
+    const transDuration = parseFloat(document.getElementById('transitionDuration').value) * 1000;
+    const fakeTime = document.getElementById('fakeTime').value;
+    const opacity = parseFloat(document.getElementById('notifOpacity').value);
+    const totalCycle = notifDuration + transDuration;
+    const currentTime = progress * totalCycle * notifications.length;
+    let activeIndex = Math.floor(currentTime / totalCycle);
+    let cycleProgress = (currentTime % totalCycle) / totalCycle;
+    for (let i = 0; i <= activeIndex && i < notifications.length; i++) {
+        const notif = notifications[i]; let yOffset = 0, alpha = opacity, slideOffset = 0;
+        if (i === activeIndex) {
+            const animProgress = Math.min(1, cycleProgress * totalCycle / transDuration);
+            slideOffset = (1 - easeOutCubic(animProgress)) * -100 * scale;
+            alpha = opacity * easeOutCubic(animProgress);
+            yOffset = (activeIndex - i) * 180 * scale;
+        } else if (i < activeIndex) {
+            yOffset = (activeIndex - i) * 180 * scale;
+            if (activeIndex - i > 3) alpha = 0;
+            else alpha = opacity * (1 - (activeIndex - i) * 0.15);
+        }
+        if (alpha <= 0.01) continue;
+        drawNotificationCardToCanvas(c, W, H, notif, fakeTime, i, yOffset, slideOffset, alpha, scale);
+    }
+}
+
+function drawNotificationCardToCanvas(c, W, H, text, fakeTime, index, yOffset, slideOffset, alpha, scale) {
+    const cardW = W - 80 * scale, cardH = 140 * scale, cardX = 40 * scale, baseY = 560 * scale;
+    const cardY = baseY - yOffset + slideOffset;
+    c.save(); c.globalAlpha = alpha;
+    c.fillStyle = 'rgba(245,245,250,'+alpha+')';
+    roundRectScaled(c, cardX, cardY, cardW, cardH, 30 * scale); c.fill();
+    c.strokeStyle = 'rgba(200,200,210,0.3)'; c.lineWidth = 1;
+    roundRectScaled(c, cardX, cardY, cardW, cardH, 30 * scale); c.stroke();
+    const iconX = cardX + cardW - 80 * scale, iconY = cardY + 25 * scale;
+    c.fillStyle = '#999'; c.font = (32 * scale) + 'px Arial'; c.textAlign = 'center';
+    c.fillText('✉', iconX + 20 * scale, iconY + 30 * scale);
+    c.fillStyle = '#bbb'; c.font = (28 * scale) + 'px Arial';
+    c.fillText('⋯', iconX + 70 * scale, iconY + 28 * scale);
+    c.fillStyle = '#333'; c.font = '700 ' + (28 * scale) + 'px "Tajawal",sans-serif'; c.textAlign = 'right';
+    c.fillText('الآن', cardX + cardW - 160 * scale, cardY + 50 * scale);
+    c.fillStyle = '#e53e3e';
+    c.beginPath(); c.moveTo(cardX + cardW - 210 * scale, cardY + 38 * scale); c.lineTo(cardX + cardW - 200 * scale, cardY + 38 * scale); c.lineTo(cardX + cardW - 205 * scale, cardY + 48 * scale); c.fill();
+    c.fillStyle = '#666'; c.font = '400 ' + (24 * scale) + 'px "Tajawal",sans-serif';
+    c.fillText(fakeTime, cardX + cardW - 280 * scale, cardY + 50 * scale);
+    c.fillStyle = '#1a1a2e'; c.font = '700 ' + (38 * scale) + 'px "Tajawal",sans-serif'; c.textAlign = 'center';
+    const maxWidth = cardW - 60 * scale;
+    const words = text.split(' '); let line = '', lines = [];
+    for (let word of words) {
+        const testLine = line + word + ' ';
+        const metrics = c.measureText(testLine);
+        if (metrics.width > maxWidth && line !== '') { lines.push(line); line = word + ' '; }
+        else { line = testLine; }
+    }
+    lines.push(line);
+    const lineHeight = 48 * scale, startY = cardY + 95 * scale - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((l, i) => { c.fillText(l.trim(), cardX + cardW / 2, startY + i * lineHeight); });
+    c.restore();
+}
+
+function roundRectScaled(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y);
+    c.quadraticCurveTo(x + w, y, x + w, y + r); c.lineTo(x + w, y + h - r);
+    c.quadraticCurveTo(x + w, y + h, x + w - r, y + h); c.lineTo(x + r, y + h);
+    c.quadraticCurveTo(x, y + h, x, y + h - r); c.lineTo(x, y + r);
+    c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+}
+
+window.addEventListener('load', init);
+    </script>
+</body>
+</html>
